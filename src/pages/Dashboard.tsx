@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { PlusCircle, AlertCircle, RefreshCw } from "lucide-react";
+import { PlusCircle, AlertCircle, RefreshCw, FileText } from "lucide-react";
 import { invoiceApi } from "../api/invoiceApi";
 import { Invoice } from "../types/invoice";
 import { formatCurrency, formatDate } from "../utils/formatters";
@@ -27,7 +27,6 @@ export default function Dashboard() {
     fetchInvoices();
   }, []);
 
-  // Helper to color-code statuses
   const getStatusBadge = (status: Invoice["status"]) => {
     const styles = {
       paid: "bg-green-100 text-green-800",
@@ -46,7 +45,6 @@ export default function Dashboard() {
 
   return (
     <div>
-      {/* Header section */}
       <div className="sm:flex sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-gray-900">
@@ -93,8 +91,30 @@ export default function Dashboard() {
               </div>
             )}
 
+            {/* Empty State */}
+            {!isLoading && !error && invoices.length === 0 && (
+              <div className="text-center py-16 px-4 border-2 border-dashed border-gray-300 rounded-lg bg-white">
+                <FileText className="mx-auto h-12 w-12 text-gray-400" />
+                <h3 className="mt-2 text-sm font-semibold text-gray-900">
+                  No invoices
+                </h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  Get started by creating a new invoice.
+                </p>
+                <div className="mt-6">
+                  <Link
+                    to="/invoice/new"
+                    className="inline-flex items-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+                  >
+                    <PlusCircle className="w-4 h-4 mr-2" />
+                    New Invoice
+                  </Link>
+                </div>
+              </div>
+            )}
+
             {/* Success State / Table */}
-            {!isLoading && !error && (
+            {!isLoading && !error && invoices.length > 0 && (
               <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
                 <table className="min-w-full divide-y divide-gray-300">
                   <thead className="bg-gray-50">
