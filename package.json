@@ -47,6 +47,7 @@
     ]
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.0",
     "tailwindcss": "3"
   }
 }
