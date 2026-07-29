@@ -7,6 +7,9 @@ import {
   FileText,
   Search,
   Filter,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
 } from "lucide-react";
 import { invoiceApi } from "../api/invoiceApi";
 import { Invoice } from "../types/invoice";
@@ -21,6 +24,8 @@ export default function Dashboard() {
   const [searchParams, setSearchParams] = useSearchParams();
   const searchQuery = searchParams.get("q") || "";
   const statusFilter = searchParams.get("status") || "all";
+  const sortField = searchParams.get("sort") || "issueDate";
+  const sortDir = searchParams.get("dir") || "desc";
 
   const fetchInvoices = async () => {
     setIsLoading(true);
@@ -39,7 +44,6 @@ export default function Dashboard() {
     fetchInvoices();
   }, []);
 
-  // Update URL params without losing existing ones
   const updateSearchParam = (key: string, value: string) => {
     const newParams = new URLSearchParams(searchParams);
     if (value && value !== "all") {
@@ -50,16 +54,42 @@ export default function Dashboard() {
     setSearchParams(newParams);
   };
 
-  // Apply filters to our loaded data
+  const handleSort = (field: keyof Invoice) => {
+    const newParams = new URLSearchParams(searchParams);
+    if (sortField === field) {
+      // Toggle direction if clicking the same field
+      newParams.set("dir", sortDir === "asc" ? "desc" : "asc");
+    } else {
+      // New field, default to descending (newest/highest first is usually better for invoices)
+      newParams.set("sort", field);
+      newParams.set("dir", "desc");
+    }
+    setSearchParams(newParams);
+  };
+
+  // 1. First Filter
   const filteredInvoices = invoices.filter((invoice) => {
     const matchesSearch =
       invoice.invoiceNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
       invoice.customerName.toLowerCase().includes(searchQuery.toLowerCase());
-
     const matchesStatus =
       statusFilter === "all" || invoice.status === statusFilter;
-
     return matchesSearch && matchesStatus;
+  });
+
+  // 2. Then Sort
+  const sortedInvoices = [...filteredInvoices].sort((a, b) => {
+    let comparison = 0;
+
+    if (sortField === "totalAmount") {
+      comparison = a.totalAmount - b.totalAmount;
+    } else if (sortField === "issueDate" || sortField === "dueDate") {
+      // ISO strings sort naturally, but parsing to Date is safer
+      comparison =
+        new Date(a[sortField]).getTime() - new Date(b[sortField]).getTime();
+    }
+
+    return sortDir === "asc" ? comparison : -comparison;
   });
 
   const getStatusBadge = (status: Invoice["status"]) => {
@@ -68,13 +98,45 @@ export default function Dashboard() {
       unpaid: "bg-gray-100 text-gray-800",
       overdue: "bg-red-100 text-red-800",
     };
-
     return (
       <span
         className={`px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${styles[status]}`}
       >
         {status}
       </span>
+    );
+  };
+
+  // Helper component for sortable headers
+  const SortableHeader = ({
+    field,
+    label,
+  }: {
+    field: keyof Invoice;
+    label: string;
+  }) => {
+    const isActive = sortField === field;
+    return (
+      <th
+        scope="col"
+        className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900 cursor-pointer group hover:bg-gray-100 transition-colors"
+        onClick={() => handleSort(field)}
+      >
+        <div className="flex items-center gap-1">
+          {label}
+          <span
+            className={`text-gray-400 ${isActive ? "text-blue-600" : "opacity-0 group-hover:opacity-100"}`}
+          >
+            {isActive && sortDir === "asc" ? (
+              <ArrowUp className="h-4 w-4" />
+            ) : isActive && sortDir === "desc" ? (
+              <ArrowDown className="h-4 w-4" />
+            ) : (
+              <ArrowUpDown className="h-4 w-4" />
+            )}
+          </span>
+        </div>
+      </th>
     );
   };
 
@@ -154,7 +216,6 @@ export default function Dashboard() {
               </div>
             )}
 
-            {/* Absolute Empty State (No data in system) */}
             {!isLoading && !error && invoices.length === 0 && (
               <div className="text-center py-16 px-4 border-2 border-dashed border-gray-300 rounded-lg bg-white mt-4">
                 <FileText className="mx-auto h-12 w-12 text-gray-400" />
@@ -167,11 +228,10 @@ export default function Dashboard() {
               </div>
             )}
 
-            {/* Search No Results State (Data exists, but filtered out) */}
             {!isLoading &&
               !error &&
               invoices.length > 0 &&
-              filteredInvoices.length === 0 && (
+              sortedInvoices.length === 0 && (
                 <div className="text-center py-16 px-4 border-2 border-dashed border-gray-300 rounded-lg bg-white mt-4">
                   <Search className="mx-auto h-12 w-12 text-gray-400" />
                   <h3 className="mt-2 text-sm font-semibold text-gray-900">
@@ -190,7 +250,7 @@ export default function Dashboard() {
               )}
 
             {/* Success State / Table */}
-            {!isLoading && !error && filteredInvoices.length > 0 && (
+            {!isLoading && !error && sortedInvoices.length > 0 && (
               <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
                 <table className="min-w-full divide-y divide-gray-300">
                   <thead className="bg-gray-50">
@@ -201,15 +261,9 @@ export default function Dashboard() {
                       <th className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
                         Customer
                       </th>
-                      <th className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                        Issue Date
-                      </th>
-                      <th className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                        Due Date
-                      </th>
-                      <th className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                        Amount
-                      </th>
+                      <SortableHeader field="issueDate" label="Issue Date" />
+                      <SortableHeader field="dueDate" label="Due Date" />
+                      <SortableHeader field="totalAmount" label="Amount" />
                       <th className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
                         Status
                       </th>
@@ -219,7 +273,7 @@ export default function Dashboard() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 bg-white">
-                    {filteredInvoices.map((invoice) => (
+                    {sortedInvoices.map((invoice) => (
                       <tr key={invoice.id} className="hover:bg-gray-50">
                         <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
                           {invoice.invoiceNumber}
